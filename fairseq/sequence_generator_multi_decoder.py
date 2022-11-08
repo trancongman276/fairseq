@@ -186,6 +186,7 @@ class MultiDecoderSequenceGenerator(nn.Module):
             .fill_(mt_decoder.padding_idx)
             .int()
         )  # B x T
+        text_ls = {}
         for i, hypo in enumerate(finalized_mt):
             i_beam = 0
             tmp = hypo[i_beam]["tokens"].int()  # hyp + eos
@@ -204,6 +205,7 @@ class MultiDecoderSequenceGenerator(nn.Module):
                 text = text[1:]
             sample_id = sample["id"].tolist()[i]
             print("{} (None-{})".format(text, sample_id))
+            text_ls[sample_id] = text
 
         x = mt_decoder(
             prev_output_tokens_mt,
@@ -253,4 +255,5 @@ class MultiDecoderSequenceGenerator(nn.Module):
             bos_token,
             encoder_outs_aug=encoder_outs_aug,
         )
+        finalized["text"] = text_ls
         return finalized
