@@ -105,6 +105,7 @@ class S2THubInterface(nn.Module):
             cls.tgt_lang = tgt_lang or task.data_cfg.hub.get("tgt_lang", None)
         prefix = cls.get_prefix_token(task, cls.tgt_lang)
         pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
+        text_ls = pred_tokens[-1]
         pred = cls.detokenize(task, pred_tokens[0][0]["tokens"])
         eos_token = task.data_cfg.config.get("eos_token", None)
         if eos_token:
@@ -129,8 +130,8 @@ class S2THubInterface(nn.Module):
                 cls.tts_model = {"model": tts_model,
                                  "tts_model_id": tts_model_id,
                                  "speaker": speaker}      
-            pred = (pred, cls.tts_model["model"].predict(pred, speaker=cls.tts_model["speaker"]))
-        return pred
+            pred = (pred, text_ls, cls.tts_model["model"].predict(pred, speaker=cls.tts_model["speaker"]))
+        return (pred, text_ls)
 
     def predict(
         self,
