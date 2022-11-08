@@ -255,5 +255,5 @@ class MultiDecoderSequenceGenerator(nn.Module):
             bos_token,
             encoder_outs_aug=encoder_outs_aug,
         )
-        finalized["text"] = text_ls
+        finalized.append(text_ls)
         return finalized
