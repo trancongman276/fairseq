@@ -33,6 +33,8 @@ class S2THubInterface(nn.Module):
             self.model.cuda()
         self.model.eval()
         self.generator = self.task.build_generator([self.model], self.cfg.generation)
+        self.tts_model = None
+        self.tgt_lang = None
 
     @classmethod
     def get_model_input(cls, task, audio: Union[str, torch.Tensor]):
@@ -97,8 +99,9 @@ class S2THubInterface(nn.Module):
     def get_prediction(
         cls, task, model, generator, sample, tgt_lang=None, synthesize_speech=False
     ) -> Union[str, Tuple[str, Tuple[torch.Tensor, int]]]:
-        _tgt_lang = tgt_lang or task.data_cfg.hub.get("tgt_lang", None)
-        prefix = cls.get_prefix_token(task, _tgt_lang)
+        if cls.tgt_lang is None:
+            cls.tgt_lang = tgt_lang or task.data_cfg.hub.get("tgt_lang", None)
+        prefix = cls.get_prefix_token(task, cls.tgt_lang)
         pred_tokens = generator.generate([model], sample, prefix_tokens=prefix)
         pred = cls.detokenize(task, pred_tokens[0][0]["tokens"])
         eos_token = task.data_cfg.config.get("eos_token", None)
@@ -106,12 +109,13 @@ class S2THubInterface(nn.Module):
             pred = " ".join(pred.split(" ")[:-1])
 
         if synthesize_speech:
-            pfx = f"{_tgt_lang}_" if task.data_cfg.prepend_tgt_lang_tag else ""
-            tts_model_id = task.data_cfg.hub.get(f"{pfx}tts_model_id", None)
-            speaker = task.data_cfg.hub.get(f"{pfx}speaker", None)
-            if tts_model_id is None:
-                logger.warning("TTS model configuration not found")
-            else:
+            if cls.tts_model is None:
+                pfx = f"{cls.tgt_lang}_" if task.data_cfg.prepend_tgt_lang_tag else ""
+                tts_model_id = task.data_cfg.hub.get(f"{pfx}tts_model_id", None)
+                speaker = task.data_cfg.hub.get(f"{pfx}speaker", None)
+                if tts_model_id is None:
+                    logger.warning("TTS model configuration not found")
+                    return pred
                 temp = tts_model_id.split(":")
                 if len(temp) == 2:
                     _repo, _id = temp
@@ -120,7 +124,10 @@ class S2THubInterface(nn.Module):
                 else:
                     raise Exception("Invalid TTS model path")
                 tts_model = torch.hub.load(_repo, _id, verbose=False)
-                pred = (pred, tts_model.predict(pred, speaker=speaker))
+                cls.tts_model = {"model": tts_model,
+                                 "tts_model_id": tts_model_id,
+                                 "speaker": speaker}      
+            pred = (pred, cls.tts_model["model"].predict(pred, speaker=cls.tts_model["speaker"]))
         return pred
 
     def predict(
