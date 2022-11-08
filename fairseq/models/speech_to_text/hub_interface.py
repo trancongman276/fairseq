@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class S2THubInterface(nn.Module):
+    
+    tts_model = None
+    tgt_lang = None
+    
     def __init__(self, cfg, task, model):
         super().__init__()
         self.cfg = cfg
@@ -33,8 +37,6 @@ class S2THubInterface(nn.Module):
             self.model.cuda()
         self.model.eval()
         self.generator = self.task.build_generator([self.model], self.cfg.generation)
-        self.tts_model = None
-        self.tgt_lang = None
 
     @classmethod
     def get_model_input(cls, task, audio: Union[str, torch.Tensor]):
